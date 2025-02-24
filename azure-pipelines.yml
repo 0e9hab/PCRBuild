@@ -184,15 +184,15 @@ stages:
               -var customer_subscription_contributor_firstname=${{ parameters.customer_subscription_contributor_firstname }} \
               -var customer_subscription_contributor_lastname=${{ parameters.customer_subscription_contributor_lastname }}
 
-          owner_password=$(terraform output "customer_subscription_owner_password" | sed 's/^"//;s/"$//')          
-          echo "Owner Password: $owner_password"
-          owner_principal=$(terraform output "user_principal_name" | sed 's/^"//;s/"$//')
-          echo "Owner Principal: $owner_principal"
+              owner_password=$(terraform output "customer_subscription_owner_password" | sed 's/^"//;s/"$//')          
+              echo "Owner Password: $owner_password"
+              owner_principal=$(terraform output "user_principal_name" | sed 's/^"//;s/"$//')
+              echo "Owner Principal: $owner_principal"
 
-          echo "##vso[task.setvariable variable=password;isOutput=true]$owner_password"
-          echo "##vso[task.setvariable variable=principal;isOutput=true]$owner_principal"
+              echo "##vso[task.setvariable variable=password;isOutput=true]$owner_password"
+              echo "##vso[task.setvariable variable=principal;isOutput=true]$owner_principal"
       name: setVariables
- 
+
 - stage: savepassword
   dependsOn: TerraformRun
   pool: 'DevOps-Agents-VMS'
