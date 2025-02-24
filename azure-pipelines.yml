@@ -89,8 +89,9 @@ stages:
 
 - stage: savepassword
   dependsOn: TerraformRun
-  pool: 'DevOps-Agents-VMS'
-  
+  pool:
+   vmImage: ubuntu-latest
+   
   jobs:
     - job: SavePASSToKeyVault
       displayName: "Save password to KeyVault"
