@@ -1,202 +1,96 @@
 trigger:
 - none
- 
 parameters:
-- name: Action
-  displayName: Action
+- name: location
+  displayName: "Azure region"
   type: string
-  default: 'plan'
-  values:
-    - 'plan'
-    - 'apply -auto-approve'
-    - 'destroy -auto-approve'
-- name: country_code
-  displayName: country_code
-  type: string
-  values:
-    - 'GB-Commercial'
-    - 'GB-Official'
-    - 'IT-Commercial'
-    - 'IE-Commercial'
-    - 'ES-Commercial'
-    - 'PT-Commercial'
-    - 'AL-Commercial'
- 
-- name: customer_domain_name
-  displayName: "Customer Domain Name"
-  type: string
-  default: ""
- 
-- name: customer_subscription_owner_firstname
-  displayName: "Customer Subscription Owner First Name"
-  type: string
-  default: " "
-- name: customer_subscription_owner_lastname
-  displayName: "Customer Subscription Owner Last Name"
-  type: string
-  default: " "
- 
-- name: customer_subscription_contributor_firstname
-  displayName: "Customer Subscription Contributor First Name"
-  type: string
-  default: " "
-- name: customer_subscription_contributor_lastname
-  displayName: "Customer Subscription Contributor Last Name"
-  type: string
-  default: " "
- 
-- name: customer_security_contact_email
-  displayName: "Customer Security Contact Email"
-  type: string
-  default: ""
-- name: customer_service_health_contact_email
-  displayName: "Customer Service Health Contact Email"
-  type: string
-  default: ""
-- name: customer_budget_contact_email
-  displayName: "Customer Budget Contact Email"
-  type: string
-  default: ""
- 
-- name: budgeted_amount
-  displayName: "Budgeted Amount"
-  type: number
-  default: "0"
- 
-- name: vodafone_support_primary_L2_username
-  displayName: "Vodafone Support Primary L2 Username"
-  type: string
-  default: " "
-- name: vodafone_support_primary_L2_useremail
-  displayName: "Vodafone Support Primary L2 User Email"
-  type: string
-  default: " "
- 
-- name: customer_tenant_id
-  displayName: "Customer Tenant ID"
-  type: string
-  default: ""
-- name: customer_subscription_id
-  displayName: "Customer Subscription ID"
-  type: string
-  default: ""
- 
+  default: 'eastus'
+
 - name: customer_client_id
   displayName: "Customer Client ID"
   type: string
-  default: ""
+  default: "857530e9-0b30-421c-b00b-815a801fac72"
+
 - name: customer_client_secret
   displayName: "Customer Client Secret"
   type: string
-  default: ""
- 
-variables:
-  action: ${{ parameters.Action }}
- 
+  default: "6Lw8Q~WP-ad0lNh.NetL8mhr3seGK~VWUnxaOaHh"
+  
+- name: customer_tenant_id
+  displayName: "Customer Tenant ID"
+  type: string
+  default: "67e121b7-8bbd-4f33-a75e-333e1049d85f"
+
+- name: customer_subscription_id
+  displayName: "Customer Subscription ID"
+  type: string
+  default: "f58fa3a0-e890-4321-b6c5-22da5adc8d94"
+  
+- name: default_domain_name
+  displayName: "Default Domain Name"
+  type: string
+  default: "ehabmoghazihotmail"
+
+- name: customer_subscription_owner_first_name
+  displayName: "Subscription Owner First Name"
+  type: string
+  default: "devops"
+# - name: customer_subscription_owner_last_name 
+#   displayName: "Subscription Owner Last Name"
+#   type: string
+#   default: "sh"
+
 stages:
-- stage: IntializingProviders
-  condition: eq(variables.Action, 'apply -auto-approve')
-  displayName: 'Initializing Providers'
-  jobs:
-    - job: 'InitializingProviders'
-      displayName: 'Initializing Providers'
-      pool: 'DevOps-Agents-VMS'
-      steps:
-        - script: |
-            az login --service-principal -u ${{parameters.customer_client_id}} -p ${{parameters.customer_client_secret}} --tenant ${{parameters.customer_tenant_id}}
-            az account set -s ${{parameters.customer_subscription_id}}
- 
-            Rproviders=("Microsoft.Management" "Microsoft.KeyVault" "Microsoft.Network" "Microsoft.Advisor" "Microsoft.Storage" "Microsoft.OperationalInsights" "Microsoft.PolicyInsights" "Microsoft.Kusto" "Microsoft.App" "Microsoft.ManagedIdentity" "Microsoft.Security" "Microsoft.ADHybridHealthService" "microsoft.insights")
-            # Loop through the resource providers
-            for Rprovider in "${Rproviders[@]}"; do
-              echo "Attempting to register $Rprovider..."
- 
-              # Attempt to register the provider
-              if ! az provider register --namespace "$Rprovider"; then
-                echo "Error: Failed to register $Rprovider. Skipping to the next provider..."
-                continue
-              fi
- 
-              echo "Registration command issued successfully for $Rprovider. Checking status..."
- 
-              # Check the registration status until it becomes "Registered"
-              RegistrationState=$(az provider show --namespace "$Rprovider" --query 'registrationState' --output tsv 2>/dev/null)
-              while [ "$RegistrationState" != "Registered" ]; do
-                echo "Current state of $Rprovider: $RegistrationState. Waiting 5 seconds..."
-                sleep 5
-                RegistrationState=$(az provider show --namespace "$Rprovider" --query 'registrationState' --output tsv 2>/dev/null)
-              done
- 
-              echo "$Rprovider is now registered."
-            done
- 
-            echo "All providers processed."
 - stage: TerraformRun
   displayName: 'Terraform Run'
-  dependsOn: IntializingProviders
-  condition: always()
-  pool: 'DevOps-Agents-VMS'
+  pool:
+   vmImage: ubuntu-latest
   jobs:
-  - job: ManualApprovalResourcesStep
-    condition: and(always(), eq(variables.Action, 'destroy -auto-approve'))
-    displayName: "Review and Approve Resources Cleanup"
-    pool: server 
-    steps:
-      - task: ManualValidation@1
-        timeoutInMinutes: 5
-        inputs:
-          notifyUsers: ""
-          instructions: "Are you sure, you want to delete the configuration?"
-          onTimeout: 'reject'
- 
-  - job: TerraformJob
-    condition: |
-      or(
-        succeeded('ManualApprovalResourcesStep'),
-        not(failed('ManualApprovalResourcesStep'))
-      )   
-    displayName: 'Terraform Job'
-    dependsOn: ManualApprovalResourcesStep
- 
-    steps:
-    - script: |
-            cd cmdb/customer
- 
-            sed -i "s/cststate/${{ parameters.customer_domain_name }}/g" main.tf
- 
+    - job: TerraformJob
+      displayName: 'Terraform Job'
+      steps:
+        - script: |
+            echo "Location: ${{ parameters.location }}"
+            dateYMD=$(date +%Y%m%dT%H%M%S%NZ)
+            workspace=my_workspace_${dateYMD}
+            echo $dateYMD
+
+            terraform workspace new $workspace
             terraform init
-            terraform workspace select ${{parameters.customer_domain_name}} || terraform workspace new ${{parameters.customer_domain_name}} 
-            terraform ${{ parameters.Action }} \
-              -var country_code=${{ parameters.country_code }} \
-              -var company_name=${{ parameters.customer_domain_name }} \
-              -var customer_subscription_owner_firstname=${{ parameters.customer_subscription_owner_firstname }} \
-              -var customer_subscription_owner_lastname=${{ parameters.customer_subscription_owner_lastname }} \
-              -var customer_security_contact_email=${{ parameters.customer_security_contact_email }} \
-              -var customer_service_health_contact_email=${{ parameters.customer_service_health_contact_email }} \
-              -var customer_budget_contact_email=${{ parameters.customer_budget_contact_email }} \
+
+            terraform plan \
               -var customer_subscription_id=${{ parameters.customer_subscription_id }} \
-              -var customer_client_id=${{ parameters.customer_client_id }} \
+              -var customer_client_id=${{ parameters.customer_client_id}} \
               -var customer_tenant_id=${{ parameters.customer_tenant_id }} \
               -var customer_client_secret=${{ parameters.customer_client_secret }} \
-              -var budget_amount=${{ parameters.budgeted_amount }} \
-              -var vodafone_support_primary_L2_username=${{ parameters.vodafone_support_primary_L2_username }} \
-              -var vodafone_support_primary_L2_useremail=${{ parameters.vodafone_support_primary_L2_useremail }} \
-              -var customer_subscription_contributor_firstname=${{ parameters.customer_subscription_contributor_firstname }} \
-              -var customer_subscription_contributor_lastname=${{ parameters.customer_subscription_contributor_lastname }}
- 
-      # Extract outputs
-            owner_password=$(terraform output "customer_subscription_owner_password" | sed 's/^"//;s/"$//')          
+              -var location=${{ parameters.location }} \
+              -var domain_name=${{parameters.default_domain_name}} \
+              -var customer_subscription_owner_first_name=${{parameters.customer_subscription_owner_first_name}} \
+              -var customer_subscription_owner_last_name=$(date +%S%3N)
+
+            terraform apply --auto-approve \
+              -var customer_subscription_id=${{ parameters.customer_subscription_id }} \
+              -var customer_client_id=${{ parameters.customer_client_id}} \
+              -var customer_tenant_id=${{ parameters.customer_tenant_id }} \
+              -var customer_client_secret=${{ parameters.customer_client_secret }} \
+              -var location=${{ parameters.location }} \
+              -var domain_name=${{parameters.default_domain_name}} \
+              -var customer_subscription_owner_first_name=${{parameters.customer_subscription_owner_first_name}} \
+              -var customer_subscription_owner_last_name=$(date +%S%3N) 
+
+            owner_password=$(terraform output "customer_subscription_owner_password" | sed 's/^"//;s/"$//')     
             echo "Owner Password: $owner_password"
             owner_principal=$(terraform output "user_principal_name" | sed 's/^"//;s/"$//')
             echo "Owner Principal: $owner_principal"
-            # Set the output variables
             echo "##vso[task.setvariable variable=password;isOutput=true]$owner_password"
             echo "##vso[task.setvariable variable=principal;isOutput=true]$owner_principal"
           name: setVariables
- 
+          
+
 - stage: savepassword
   dependsOn: TerraformRun
   pool: 'DevOps-Agents-VMS'
+  
   jobs:
     - job: SavePASSToKeyVault
       displayName: "Save password to KeyVault"
@@ -209,12 +103,13 @@ stages:
             echo "Owner Principal: $(owner_principal)"
         - task: AzureCLI@2
           inputs:
-            azureSubscription: 'vf-cor-devops-pcr-access'
+            azureSubscription: 'vf-core-devops-pcr-access'
             scriptType: 'bash'
             scriptLocation: 'inlineScript'
             inlineScript: |
               echo "Owner Password: $(owner_password)"
               echo "Owner Principal: $(owner_principal)"
+              
                 seconds=$(date +%S)
                 az keyvault secret set --vault-name 'vf-core-devops-pcr-kv' --name "${{parameters.default_domain_name}}-PASS-${seconds}" --value "$(owner_password)"
                 az keyvault secret set --vault-name 'vf-core-devops-pcr-kv' --name "${{parameters.default_domain_name}}-PRINC-${seconds}" --value "$(owner_principal)"
