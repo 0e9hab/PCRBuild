@@ -1,0 +1,41 @@
+trigger:
+- master
+
+pool: "AzureSHA"
+  #vmImage: ubuntu-latest
+
+stages:
+# Stage 1: Code Checkout
+- stage: Checkout
+  displayName: "Checkout Code"
+  jobs:
+  - job: CheckoutJob
+    displayName: "Checkout Repository"
+    steps:
+    - checkout: self
+      fetchDepth: 0
+
+# Stage 2: SonarQube Analysis
+- stage: SonarQubeAnalysis
+  displayName: "SonarQube Code Analysis"
+  dependsOn: Checkout
+  jobs:
+  - job: SonarQubeJob
+    displayName: "Run SonarQube Analysis"
+    steps:
+    # Prepare the environment for SonarQube analysis
+    - task: SonarQubePrepare@7
+      inputs:
+        SonarQube: 'sonarqube-service-connection'
+        scannerMode: 'cli'
+        configMode: 'manual'
+        cliProjectKey: 'vfgroup-cloudenabler-am-pcr-azure'
+
+    # Run the SonarQube analysis
+    - task: SonarQubeAnalyze@7
+      displayName: 'SonarCloud Scan'
+
+    # Publish the results to SonarQube
+    - task: SonarQubePublish@7
+      inputs:
+        pollingTimeoutSec: '300'
